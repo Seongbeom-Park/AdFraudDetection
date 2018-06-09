@@ -13,11 +13,8 @@ from keras.utils.np_utils import to_categorical
 from keras.metrics import categorical_accuracy
 from sklearn.preprocessing import LabelEncoder
 
-def load_train_data(inputPath='./input_gen.csv', outputPath='./output_gen.csv'):
+def load_train_data(inputPath, outputPath):
     # Pre-processed Data
-    #inputPath = './input_gen.csv'
-    #outputPath = './output_gen.csv'
-    
     dataFrame = pandas.read_csv(inputPath, delimiter=',', header = None)
     inputDataSet = dataFrame.values
     dataFrame = pandas.read_csv(outputPath, delimiter=',', header = None)
@@ -78,29 +75,29 @@ def load_or_create_model(numInput, numOutput, modelFile):
     if not os.path.isfile(modelFile + '.' + str(index)):
         myModel = baselineModel(numInput, numOutput)
     else:
-        myModel = load_model(modelFile)
+        while os.path.isfile(modelFile + '.' + str(index+1)):
+            index += 1
+        myModel = load_model(modelFile + '.' + str(index))
 
     #myModel = baselineModel()
     print(myModel.summary())
 
     return myModel, index
 
-def train_and_save_model(myModel, inputDataSet, outputDataSet, modelFile, index):
+def train_and_save_model(myModel, inputDataSet, outputDataSet, modelFile):
     myModel.fit(inputDataSet, outputDataSet, epochs=5, batch_size=100, validation_split=0.1, verbose=1)
     if modelFile != None:
-        myModel.save(modelFile + '.' + str(index))
+        myModel.save(modelFile)
 
     return myModel
 
-def load_test_data(testInput = './input_real.csv', testOutput = './output_real.csv'):
-    #testInput = './input_real.csv'
-    #testOutput = './output_real.csv'
+def load_test_data(testInput, testOutput, frac = 1):
     dataFrame = pandas.read_csv(testInput, delimiter=',', header = None)
     inputDataSet = dataFrame.values
-    inputDataSet = inputDataSet[:(len(inputDataSet) / 200)]
+    inputDataSet = inputDataSet[:(len(inputDataSet) * frac)]
     dataFrame = pandas.read_csv(testOutput, delimiter=',', header = None)
     outputDataSet = dataFrame.values
-    outputDataSet = outputDataSet[:(len(outputDataSet) / 200)]
+    outputDataSet = outputDataSet[:(len(outputDataSet) * frac)]
 
     return inputDataSet, outputDataSet
 
@@ -144,20 +141,22 @@ def evaluate_model(myModel, inputDataSet, outputDataSet):
     return falseNeg
 
 if __name__ == '__main__':
-    inputDataSet, outputDataSet, numInput, numOutput = load_train_data()
-    inputTestDataSet, outputTestDataSet = load_test_data()
+    inputPath = './input_gen.csv'
+    outputPath = './output_gen.csv'
+    inputDataSet, outputDataSet, numInput, numOutput = load_train_data(inputPath, outputPath)
+    testInput = './input_real.csv'
+    testOutput = './output_real.csv'
+    frac = 0.05
+    inputTestDataSet, outputTestDataSet = load_test_data(testInput, testOutput, frac)
     modelFile = 'DNN_Model.h5'
-    omitting_steps = 0 # checkpoint every after omitting_steps+1
+    omitting_steps = 0 # make a checkpoint in omitting_steps+1
     model, index = load_or_create_model(numInput, numOutput, modelFile)
-    min_falseNeg = math.inf
     while True:
         for i in range(0, omitting_steps):
-            train_and_save_model(model, inputTestDataSet, outputTestDataSet, None, index)
+            train_and_save_model(model, inputTestDataSet, outputTestDataSet, None)
             falseNeg = evaluate_model(model, inputDataSet, outputDataSet)
         index += 1
-        train_and_save_model(model, inputTestDataSet, outputTestDataSet, modelFile, index)
-        evaluate_model(model, inputDataSet, outputDataSet)
-        flaseNeg_list.append(flaseNeg)
-        if falseNeg < min_falseNeg:
-            min_falseNeg = falseNeg
-            print "index: {}, min_falseNeg: {}".format(index, min_falseNeg)
+        train_and_save_model(model, inputTestDataSet, outputTestDataSet, modelFile + '.' + str(index))
+        falseNeg = evaluate_model(model, inputDataSet, outputDataSet)
+        with open("./falseNeg_history.csv") as myfile:
+            myfile.write("{},{}\n".format(index, falseNeg))
