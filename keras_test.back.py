@@ -15,41 +15,16 @@ from sklearn.preprocessing import LabelEncoder
 
 def load_train_data(inputPath, outputPath):
     # Pre-processed Data
-    inputDataFrame = pandas.read_csv(inputPath, delimiter=',', header = None)
-    inputDataFrame.columns = ['app', 'device', 'os', 'channel', 'hour', 'min']
-    outputDataFrame = pandas.read_csv(outputPath, delimiter=',', header = None)
+    dataFrame = pandas.read_csv(inputPath, delimiter=',', header = None)
+    inputDataSet = dataFrame.values
+    dataFrame = pandas.read_csv(outputPath, delimiter=',', header = None)
+    outputDataSet = dataFrame.values
     
-    for i in range(24):
-        inputDataFrame[str(i)] = 0
-        inputDataFrame[str(i)] = np.where(inputDataFrame['hour'] == i, 1, 0)
-
-    inputDataFrame.pop('hour')
-
-    inputDataSet = inputDataFrame.values
-    outputDataSet = outputDataFrame.values
     numInput = len(inputDataSet[0])
     numOutput = len(outputDataSet[0])
 
     return inputDataSet, outputDataSet, numInput, numOutput
-
-def load_test_data(testInput, testOutput, frac = 1):
-    inputDataFrame = pandas.read_csv(testInput, delimiter=',', header = None)
-    inputDataFrame.columns = ['app', 'device', 'os', 'channel', 'hour', 'min']
-    outputDataFrame = pandas.read_csv(testOutput, delimiter=',', header = None)
-
-    for i in range(24):
-        inputDataFrame[str(i)] = 0
-        inputDataFrame[str(i)] = np.where(inputDataFrame['hour'] == i, 1, 0)
-
-    inputDataFrame.pop('hour')
-
-    inputDataSet = inputDataFrame.values
-    outputDataSet = outputDataFrame.values
-    inputDataSet = inputDataSet[:int((len(inputDataSet) * frac))]
-    outputDataSet = outputDataSet[:int((len(outputDataSet) * frac))]
-
-    return inputDataSet, outputDataSet
-   
+    
 def split_data(inputDataSet, outputDataSet, num_train = 850000):
     # Split data into 2 parts : train / test
     #num_train = 850000
@@ -111,11 +86,21 @@ def load_or_create_model(numInput, numOutput, modelFile):
     return myModel, index
 
 def train_and_save_model(myModel, inputDataSet, outputDataSet, batch_size, modelFile):
-    myModel.fit(inputDataSet, outputDataSet, epochs=1, batch_size=batch_size, validation_split=0.1, verbose=1)
+    myModel.fit(inputDataSet, outputDataSet, epochs=5, batch_size=batch_size, validation_split=0.1, verbose=1)
     if modelFile != None:
         myModel.save(modelFile)
 
     return myModel
+
+def load_test_data(testInput, testOutput, frac = 1):
+    dataFrame = pandas.read_csv(testInput, delimiter=',', header = None)
+    inputDataSet = dataFrame.values
+    inputDataSet = inputDataSet[:int((len(inputDataSet) * frac))]
+    dataFrame = pandas.read_csv(testOutput, delimiter=',', header = None)
+    outputDataSet = dataFrame.values
+    outputDataSet = outputDataSet[:int((len(outputDataSet) * frac))]
+
+    return inputDataSet, outputDataSet
 
 def evaluate_model(myModel, inputDataSet, outputDataSet):
     prediction_result = myModel.predict(inputDataSet, verbose=1)
@@ -154,7 +139,7 @@ def evaluate_model(myModel, inputDataSet, outputDataSet):
     print('Number of Ones : %d' % numberOfOne)
     print('Number of Zeros : %d' % numberOfZero)
 
-    return score[0], score[1], correctCount, len(prediction_result), falseNeg, falsePos, numberOfOne, numberOfZero
+    return falseNeg
 
 if __name__ == '__main__':
     print('[DEBUG] Processing Start')
@@ -181,8 +166,8 @@ if __name__ == '__main__':
             train_and_save_model(model, inputDataSet, outputDataSet, batch_size, None)
             #falseNeg = evaluate_model(model, inputTestDataSet, outputTestDataSet)
         train_and_save_model(model, inputDataSet, outputDataSet, batch_size, modelFile + '.' + str(index))
-        loss, acc, corr, predLen, fN, fP, numOne, numZero = evaluate_model(model, inputTestDataSet, outputTestDataSet)
-        with open("./history20180610.csv",'a') as myfile:
-            myfile.write("{},{},{},{},{},{},{},{},{}\n".format(index, loss, acc, corr, predLen, fN, fP, numOne, numZero))
-        print('[DEBUG] Train & Evaluate Done : %d' % index)
+        falseNeg = evaluate_model(model, inputTestDataSet, outputTestDataSet)
+        with open("./falseNeg_history.csv",'a') as myfile:
+            myfile.write("{},{}\n".format(index, falseNeg))
+        print('[DEBUG] Train & Evaluate Done : %d' % (index-1))
         index += 1
