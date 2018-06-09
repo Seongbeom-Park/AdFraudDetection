@@ -3,8 +3,9 @@ import pandas
 import random
 import keras
 import sklearn
+import os
 
-from keras.models import Sequential
+from keras.models import Sequential, load_model
 from keras.layers import Dense, Dropout, Activation
 from keras.optimizers import Adam, SGD
 from keras.utils import np_utils
@@ -13,8 +14,8 @@ from keras.metrics import categorical_accuracy
 from sklearn.preprocessing import LabelEncoder
 
 # Pre-processed Data
-inputPath = './input.csv'
-outputPath = './output.csv'
+inputPath = './input_gen.csv'
+outputPath = './output_gen.csv'
 
 dataFrame = pandas.read_csv(inputPath, delimiter=',', header = None)
 inputDataSet = dataFrame.values
@@ -24,67 +25,95 @@ outputDataSet = dataFrame.values
 numInput = len(inputDataSet[0])
 numOutput = len(outputDataSet[0])
 
-print(len(inputDataSet)) # 100000
-print(len(outputDataSet)) # 100000
+print(len(inputDataSet)) 
+print(len(outputDataSet))
 print(len(inputDataSet[0])) # 4
 print(len(outputDataSet[0])) # 1
 
 # DNN Model < input: 20774 -> hidden1: 512 -> hidden2: 256 -> hidden3: 128  -> hidden4 : 64 -> output: 6 >
 def baselineModel():
     model = Sequential()
-    model.add(Dense(4096, input_dim=numInput))
+    model.add(Dense(1024, input_dim=numInput))
     model.add(Activation('relu'))
     model.add(Dropout(0.5))
-    model.add(Dense(2048))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.4))
-    model.add(Dense(1024))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.3))
     model.add(Dense(512))
     model.add(Activation('relu'))
-    model.add(Dropout(0.3))
+    model.add(Dropout(0.4))
     model.add(Dense(256))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.3))
+    model.add(Dense(128))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.3))
+    model.add(Dense(64))
     model.add(Activation('relu'))
     model.add(Dense(numOutput))
     model.add(Activation('sigmoid'))
     adam = Adam(lr=1e-4)
     #sgd = SGD(lr=1e-4)
     model.compile(loss='binary_crossentropy', optimizer=adam, metrics=['accuracy'])
+    #model.compile(loss='binary_crossentropy', optimizer=sgd, metrics=['accuracy'])
     return model
 
 # Split data into 2 parts : train / test
-num_train = 90000
+num_train = 850000
 x_train = inputDataSet[:num_train]
 y_train = outputDataSet[:num_train]
 x_test = inputDataSet[num_train:]
 y_test = outputDataSet[num_train:]
 
-print(x_train[0:10])
-print(y_train[0:10])
-print(x_test[0:10])
-print(y_test[0:10])
-myModel = baselineModel()
-print(myModel.summary())
-myModel.fit(x_train, y_train, epochs=20, batch_size=100, validation_split=0.1, verbose=1)
+modelFile = 'DNN_Model.h5'
+if os.path.isfile(modelFile):
+    myModel = load_model(modelFile)
+else:
+    myModel = baselineModel()
 
-prediction_result = myModel.predict(x_test, verbose=1)
-score = myModel.evaluate(x_test, y_test, verbose=1)
-print(prediction_result[0:10])
+#myModel = baselineModel()
+print(myModel.summary())
+#myModel.fit(inputDataSet, outputDataSet, epochs=5, batch_size=100, validation_split=0.1, verbose=1)
+#myModel.save(modelFile)
+
+testInput = './input_real.csv'
+testOutput = './output_real.csv'
+dataFrame = pandas.read_csv(testInput, delimiter=',', header = None)
+inputDataSet = dataFrame.values
+inputDataSet = inputDataSet[:(len(inputDataSet) / 200)]
+dataFrame = pandas.read_csv(testOutput, delimiter=',', header = None)
+outputDataSet = dataFrame.values
+outputDataSet = outputDataSet[:(len(outputDataSet) / 200)]
+
+prediction_result = myModel.predict(inputDataSet, verbose=1)
+score = myModel.evaluate(inputDataSet, outputDataSet, verbose=1)
+print(outputDataSet[0:20])
+print(prediction_result[0:20])
 
 # Count how many 
 correctCount = 0
-correctOnes = 0
+falseNeg = 0
+falsePos = 0
+numberOfOne = 0
+numberOfZero = 0
 for i in range(len(prediction_result)):
     test = prediction_result[i]
-    cor = y_test[i]
-    if (test > 0.1 and cor == 1) or (test <= 0.1 and cor == 0):
+    cor = outputDataSet[i]
+    if cor == 1:
+        numberOfOne += 1
+    else:
+        numberOfZero += 1
+
+    if abs(cor - test) < 0.5:
         correctCount += 1
-    if (cor == 1):
-        print(test)
-        correctOnes += 1
+
+    if cor == 1 and test < 0.5:
+        falseNeg += 1
+
+    if cor == 0 and test >= 0.5: 
+        falsePos += 1
 
 print('Loss : %.4f' % score[0])
 print('Accuracy : %.4f' % score[1])
 print('Correct : %d / %d' % (correctCount, len(prediction_result)))
-print('Correct Ones : %d' % correctOnes)
+print('False Negative : %d' % falseNeg)
+print('False Positive : %d' % falsePos)
+print('Number of Ones : %d' % numberOfOne)
+print('Number of Zeros : %d' % numberOfZero)

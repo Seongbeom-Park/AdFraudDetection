@@ -2,8 +2,9 @@ import pandas
 import sklearn
 import os
 
-data_path = '/home/woori4829/talkingdata-adtracking-fraud-detection/train_sample.csv'
-#data_path = '/home/woori4829/talkingdata-adtracking-fraud-detection/train.csv' 
+#data_path = '/home/woori4829/AdFraudDetection/dataGen.csv'
+#data_path = '/home/woori4829/talkingdata-adtracking-fraud-detection/train_sample.csv'
+data_path = '/home/woori4829/talkingdata-adtracking-fraud-detection/train.csv' 
 
 # Read from file, Eliminate first row (with header = 0)
 dataFrame = pandas.read_csv(data_path, delimiter=',', header = 0)
@@ -62,13 +63,14 @@ for data in dataSet:
     tokens = clickT.split(" ")
     times = tokens[1].split(":")
 
-    inputList = [ipDict[ip], appDict[app], deviceDict[dev], osDict[os_], channelDict[chan], times[0], times[1]]
+    #inputList = [ipDict[ip], appDict[app], deviceDict[dev], osDict[os_], channelDict[chan], times[0], times[1]]
+    inputList = [appDict[app], deviceDict[dev], osDict[os_], channelDict[chan], times[0], times[1]]
     trainInput.append(inputList)
 
-inputPath = 'input.csv'
-outputPath = 'output.csv'
-#inputPath = 'input_real.csv'
-#outputPath = 'output_real.csv'
+#inputPath = 'input_gen.csv'
+#outputPath = 'output_gen.csv'
+inputPath = 'input_real.csv'
+outputPath = 'output_real.csv'
 
 # Check whether the file exists or not
 if os.path.isfile(inputPath):
